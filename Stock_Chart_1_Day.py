@@ -8,7 +8,7 @@ import time
 
 st.set_page_config(page_title="Stock Price Chart", layout="wide")
 
-st.title("📈 5분 단위 주식 등락률 차트")
+st.title("📈 10분 단위 주식 등락률 차트")
 
 # 티커 리스트
 tickers = ['QTUM', 'UFO', 'ARKG', 'URA', 'SPAM', 'XLU', 'HYDR', 'SOXX', 'VDC', 'IPAY', 'FINX', 'XLF', 'KLXY', 'XLV', 'CGW']
@@ -55,12 +55,12 @@ with st.sidebar:
         days_to_show = 5
 
 # 날짜 표시
-st.markdown(f"**기간**: {date_option} | **간격**: 5분")
+st.markdown(f"**기간**: {date_option} | **간격**: 10분")
 
 @st.cache_data(ttl=300)  # 5분 캐시
 def fetch_stock_data_api(ticker, days_back, days_to_show):
     """
-    Yahoo Finance Chart API를 직접 호출하여 주식 데이터 가져오기
+    Yahoo Finance Chart API를 직접 호출하여 주식 데이터 가져오기 (10분 간격)
     첨부 코드의 get_stock_data 함수와 동일한 방식
     """
     try:
@@ -77,7 +77,7 @@ def fetch_stock_data_api(ticker, days_back, days_to_show):
         params = {
             'period1': start_timestamp,
             'period2': end_timestamp,
-            'interval': '5m'
+            'interval': '10m'  # 10분 간격
         }
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -200,7 +200,7 @@ for idx, (ticker, df) in enumerate(all_data.items()):
 fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
 
 # 레이아웃 설정
-chart_title = f"주식 등락률 (5분 단위) - {date_option}"
+chart_title = f"주식 등락률 (10분 단위) - {date_option}"
 
 fig.update_layout(
     title={
@@ -274,7 +274,7 @@ with st.sidebar:
     
     **데이터 소스**: Yahoo Finance Chart API
     
-    **업데이트**: 5분 간격 (5분 캐시)
+    **업데이트**: 10분 간격 (5분 캐시)
     """)
     
     st.info("💡 차트를 확대/축소하려면 드래그하거나 더블클릭하세요.")
@@ -296,7 +296,7 @@ with st.sidebar:
     st.markdown("""
     ### 💡 사용 팁
     
-    **5분 데이터 특성:**
+    **10분 데이터 특성:**
     - 장중 시간대에만 데이터 생성
     - 미국 동부시간 기준 9:30 AM ~ 4:00 PM
     - 한국시간 기준 밤 11:30 PM ~ 새벽 6:00 AM
