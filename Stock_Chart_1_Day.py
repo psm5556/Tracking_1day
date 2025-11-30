@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import pytz
+import requests
 
 st.set_page_config(page_title="Stock Price Chart", layout="wide")
 
@@ -51,24 +52,96 @@ else:
 
 @st.cache_data(ttl=300)  # 5분 캐시
 def fetch_stock_data(ticker, period='1d'):
-    """5분 단위 주식 데이터 가져오기"""
+    """Yahoo Finance Chart API를 사용하여 5분 단위 주식 데이터 가져오기 (fallback 포함)"""
+    
+    # Method 1: Yahoo Finance Chart API 시도
+    try:
+        now = datetime.now()
+        
+        if period == '1d':
+            start_date = now - timedelta(days=1)
+        elif period == '5d':
+            start_date = now - timedelta(days=5)
+        else:
+            start_date = now - timedelta(days=1)
+        
+        start_timestamp = int(start_date.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+        end_timestamp = int(now.replace(hour=23, minute=59, second=59, microsecond=999000).timestamp())
+        
+        # Yahoo Finance Chart API 호출
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+        params = {
+            'period1': start_timestamp,
+            'period2': end_timestamp,
+            'interval': '5m'
+        }
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        response = requests.get(url, params=params, headers=headers, timeout=20)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # 응답 데이터 확인
+            if data.get('chart') and data['chart'].get('result') and len(data['chart']['result']) > 0:
+                result = data['chart']['result'][0]
+                timestamps = result.get('timestamp', [])
+                
+                if timestamps:
+                    # 가격 데이터 추출
+                    indicators_list = result.get('indicators', {}).get('quote', [])
+                    if indicators_list and len(indicators_list) > 0:
+                        indicators = indicators_list[0]
+                        opens = indicators.get('open', [])
+                        highs = indicators.get('high', [])
+                        lows = indicators.get('low', [])
+                        closes = indicators.get('close', [])
+                        volumes = indicators.get('volume', [])
+                        
+                        # DataFrame 생성
+                        data_list = []
+                        for i in range(len(timestamps)):
+                            if closes[i] is not None and opens[i] is not None:
+                                date = datetime.fromtimestamp(timestamps[i])
+                                data_list.append({
+                                    'Date': date,
+                                    'Open': float(opens[i]),
+                                    'High': float(highs[i]) if highs[i] is not None else float(opens[i]),
+                                    'Low': float(lows[i]) if lows[i] is not None else float(opens[i]),
+                                    'Close': float(closes[i]),
+                                    'Volume': int(volumes[i]) if volumes[i] is not None else 0
+                                })
+                        
+                        if data_list:
+                            df = pd.DataFrame(data_list)
+                            df = df.set_index('Date')
+                            df = df.sort_index()
+                            
+                            # 시작 가격을 0%로 정규화
+                            if len(df) > 0:
+                                start_price = df['Close'].iloc[0]
+                                df['Return'] = ((df['Close'] - start_price) / start_price) * 100
+                                return df
+    except Exception as e:
+        print(f"Chart API failed for {ticker}: {e}")
+    
+    # Method 2: yfinance 라이브러리 fallback
     try:
         stock = yf.Ticker(ticker)
-        # period 파라미터 사용 (1d, 5d 등)
         df = stock.history(period=period, interval='5m')
         
-        if df.empty:
-            return None
-        
-        # 시작 가격을 0%로 정규화
-        if len(df) > 0:
+        if not df.empty and len(df) > 0:
+            # 시작 가격을 0%로 정규화
             start_price = df['Close'].iloc[0]
             df['Return'] = ((df['Close'] - start_price) / start_price) * 100
             return df
-        return None
     except Exception as e:
-        st.warning(f"{ticker}: {str(e)}")
-        return None
+        print(f"yfinance failed for {ticker}: {e}")
+    
+    # 모든 방법 실패
+    return None
 
 # 데이터 로딩
 with st.spinner('데이터를 불러오는 중...'):
