@@ -11,7 +11,7 @@ st.set_page_config(page_title="Stock Price Chart", layout="wide")
 st.title("📈 5분 단위 주식 등락률 차트")
 
 # 티커 리스트
-tickers = ['QTUM', 'UFO', 'ARKG', 'URA', 'SPAM', 'XLU', 'HYDR', 'VDC', 'IPAY', 'FINX', 'XLF', 'KLXY', 'XLV', 'CGW']
+tickers = ['QTUM', 'UFO', 'ARKG', 'URA', 'SPAM', 'XLU', 'HYDR', 'SOXX', 'VDC', 'IPAY', 'FINX', 'XLF', 'KLXY', 'XLV', 'CGW']
 
 # 미국 동부 시간대 설정
 et_tz = pytz.timezone('America/New_York')
@@ -156,9 +156,9 @@ if not all_data:
 fig = go.Figure()
 
 # 각 티커의 등락률 라인 추가
-colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
-          '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
-          '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4']
+# Plotly의 qualitative color scales 자동 사용
+import plotly.express as px
+colors = px.colors.qualitative.Plotly + px.colors.qualitative.D3 + px.colors.qualitative.G10
 
 for idx, (ticker, df) in enumerate(all_data.items()):
     color = colors[idx % len(colors)]
@@ -241,6 +241,7 @@ with st.sidebar:
     - SPAM: Themes Cybersecurity ETF (사이버보안)
     - XLU: Utilities Select Sector SPDR (재생에너지 유틸리티)
     - HYDR: Global X Hydrogen ETF (수소/연료전지)
+    - SOXX: iShares Semiconductor ETF (반도체)
     - VDC: Vanguard Consumer Staples ETF (필수소비재)
     - IPAY: ETFMG Prime Mobile Payments ETF (결제)
     - FINX: Global X FinTech ETF (핀테크)
