@@ -13,6 +13,25 @@ st.title("📈 5분 단위 주식 등락률 차트")
 # 티커 리스트
 tickers = ['QTUM', 'UFO', 'ARKG', 'URA', 'SPAM', 'XLU', 'HYDR', 'SOXX', 'VDC', 'IPAY', 'FINX', 'XLF', 'KLXY', 'XLV', 'CGW']
 
+# 티커-섹터 매핑
+ticker_sectors = {
+    'QTUM': '양자컴퓨터',
+    'UFO': '우주항공',
+    'ARKG': '장수과학',
+    'URA': '원자력',
+    'SPAM': '사이버보안',
+    'XLU': '재생에너지',
+    'HYDR': '수소/연료전지',
+    'SOXX': '반도체',
+    'VDC': '필수소비재',
+    'IPAY': '결제',
+    'FINX': '핀테크',
+    'XLF': '금융',
+    'KLXY': '명품',
+    'XLV': '헬스케어',
+    'CGW': '물'
+}
+
 # 미국 동부 시간대 설정
 et_tz = pytz.timezone('America/New_York')
 now = datetime.now(et_tz)
@@ -162,11 +181,14 @@ colors = px.colors.qualitative.Plotly + px.colors.qualitative.D3 + px.colors.qua
 
 for idx, (ticker, df) in enumerate(all_data.items()):
     color = colors[idx % len(colors)]
+    # 범례에 "티커(섹터)" 형식으로 표시
+    legend_name = f"{ticker}({ticker_sectors.get(ticker, '')})"
+    
     fig.add_trace(go.Scatter(
         x=df.index,
         y=df['Return'],
         mode='lines',
-        name=ticker,
+        name=legend_name,
         line=dict(width=2, color=color),
         hovertemplate='<b>%{fullData.name}</b><br>' +
                       '시간: %{x}<br>' +
