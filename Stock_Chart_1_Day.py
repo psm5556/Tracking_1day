@@ -55,7 +55,7 @@ with st.sidebar:
         days_to_show = 5
 
 # 날짜 표시
-st.markdown(f"**기간**: {date_option} | **간격**: 10분")
+st.markdown(f"**기간**: {date_option} | **간격**: 5분")
 
 @st.cache_data(ttl=300)  # 5분 캐시
 def fetch_stock_data_api(ticker, days_back, days_to_show):
@@ -77,7 +77,7 @@ def fetch_stock_data_api(ticker, days_back, days_to_show):
         params = {
             'period1': start_timestamp,
             'period2': end_timestamp,
-            'interval': '10m'
+            'interval': '5m'
         }
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -205,7 +205,7 @@ chart_title = f"주식 등락률 (5분 단위) - {date_option}"
 fig.update_layout(
     title={
         'text': chart_title,
-        'x': 1,
+        'x': 0.5,
         'xanchor': 'center',
         'font': {'size': 20}
     },
