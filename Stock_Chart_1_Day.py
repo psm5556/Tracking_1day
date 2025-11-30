@@ -8,7 +8,7 @@ import pytz
 st.set_page_config(page_title="Stock Price Chart", layout="wide")
 
 st.title("📈 5분 단위 주식 등락률 차트")
-st.markdown("**날짜**: 2025년 11월 29일 | **기간**: 1일")
+st.markdown("**날짜**: 2025년 11월 28일 | **기간**: 1일")
 
 # 티커 리스트
 tickers = ['XLF', 'XLE', 'V', 'QTUM', 'SMH', 'UFO', 'ARKG', 'LVMHF', 'NLR']
@@ -18,7 +18,7 @@ et_tz = pytz.timezone('America/New_York')
 
 # 2025년 11월 29일 (토요일이므로 이전 금요일 데이터 사용)
 # 실제로는 11월 28일(금요일) 데이터를 가져옴
-target_date = datetime(2025, 11, 28)
+target_date = datetime(2025, 11, 27)
 start_date = target_date
 end_date = target_date + timedelta(days=1)
 
