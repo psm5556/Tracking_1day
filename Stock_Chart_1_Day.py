@@ -3,7 +3,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import pytz
-import yfinance as yf
+import requests
+import time
 
 st.set_page_config(page_title="Stock Price Chart", layout="wide")
 
@@ -25,45 +26,96 @@ with st.sidebar:
     )
     
     if date_option == "최근 1일":
-        period = "5d"  # 충분한 데이터를 위해 5일 요청
+        days_back = 5  # 충분한 데이터를 위해 5일 요청
         days_to_show = 1
     elif date_option == "최근 3일":
-        period = "5d"
+        days_back = 5
         days_to_show = 3
     else:  # 최근 5일
-        period = "5d"
+        days_back = 5
         days_to_show = 5
 
 # 날짜 표시
 st.markdown(f"**기간**: {date_option} | **간격**: 5분")
 
 @st.cache_data(ttl=300)  # 5분 캐시
-def fetch_stock_data(ticker, period, days_to_show):
+def fetch_stock_data_api(ticker, days_back, days_to_show):
     """
-    yfinance를 사용하여 주식 데이터 가져오기
+    Yahoo Finance Chart API를 직접 호출하여 주식 데이터 가져오기
+    첨부 코드의 get_stock_data 함수와 동일한 방식
     """
     try:
-        # yfinance Ticker 객체 생성
-        yf_ticker = yf.Ticker(ticker)
+        # 날짜 범위 계산
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days_back)
         
-        # 데이터 가져오기 (5분 간격)
-        df = yf_ticker.history(period=period, interval="5m")
+        # timestamp 변환
+        start_timestamp = int(start_date.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+        end_timestamp = int(end_date.replace(hour=23, minute=59, second=59, microsecond=999000).timestamp())
         
-        # 데이터가 비어있으면 None 반환
-        if df is None or df.empty:
+        # Yahoo Finance Chart API 호출
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+        params = {
+            'period1': start_timestamp,
+            'period2': end_timestamp,
+            'interval': '5m'
+        }
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        response = requests.get(url, params=params, headers=headers, timeout=20)
+        
+        if response.status_code != 200:
             return None
         
-        # 필요한 컬럼만 선택
-        df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
+        data = response.json()
         
-        # NaN 제거
-        df = df.dropna()
-        
-        if df.empty:
+        # 응답 데이터 검증
+        if not data.get('chart') or not data['chart'].get('result') or len(data['chart']['result']) == 0:
             return None
+        
+        result = data['chart']['result'][0]
+        timestamps = result.get('timestamp', [])
+        
+        if not timestamps:
+            return None
+        
+        # 가격 데이터 추출
+        indicators_list = result.get('indicators', {}).get('quote', [])
+        if not indicators_list or len(indicators_list) == 0:
+            return None
+        
+        indicators = indicators_list[0]
+        opens = indicators.get('open', [])
+        highs = indicators.get('high', [])
+        lows = indicators.get('low', [])
+        closes = indicators.get('close', [])
+        volumes = indicators.get('volume', [])
+        
+        # DataFrame 생성
+        data_list = []
+        for i in range(len(timestamps)):
+            if closes[i] is not None and opens[i] is not None and highs[i] is not None and lows[i] is not None:
+                date = datetime.fromtimestamp(timestamps[i])
+                data_list.append({
+                    'Date': date,
+                    'Open': float(opens[i]),
+                    'High': float(highs[i]),
+                    'Low': float(lows[i]),
+                    'Close': float(closes[i]),
+                    'Volume': int(volumes[i]) if volumes[i] is not None else 0
+                })
+        
+        if not data_list:
+            return None
+        
+        df = pd.DataFrame(data_list)
+        df = df.set_index('Date')
+        df = df.sort_index()
         
         # 최근 N일 데이터만 필터링
-        if days_to_show < 5:
+        if days_to_show < days_back and len(df) > 0:
             cutoff_date = df.index[-1] - timedelta(days=days_to_show)
             df = df[df.index >= cutoff_date]
         
@@ -77,7 +129,7 @@ def fetch_stock_data(ticker, period, days_to_show):
         return df
         
     except Exception as e:
-        st.warning(f"{ticker} 데이터 로드 실패: {str(e)}")
+        print(f"Error fetching data for {ticker}: {e}")
         return None
 
 # 데이터 로딩
@@ -86,16 +138,18 @@ with st.spinner('데이터를 불러오는 중...'):
     progress_bar = st.progress(0)
     
     for idx, ticker in enumerate(tickers):
-        data = fetch_stock_data(ticker, period, days_to_show)
+        data = fetch_stock_data_api(ticker, days_back, days_to_show)
         if data is not None and len(data) > 0:
             all_data[ticker] = data
+        # API rate limiting
+        time.sleep(0.1)
         progress_bar.progress((idx + 1) / len(tickers))
     
     progress_bar.empty()
 
 if not all_data:
     st.error("⚠️ 데이터를 불러올 수 없습니다.")
-    st.info("💡 yfinance API에 일시적인 문제가 있을 수 있습니다. 잠시 후 다시 시도해주세요.")
+    st.info("💡 Yahoo Finance API에 일시적인 문제가 있을 수 있습니다. 잠시 후 다시 시도해주세요.")
     st.stop()
 
 # 차트 생성
@@ -189,7 +243,7 @@ with st.sidebar:
     - LVMHF: LVMH Moët Hennessy
     - NLR: VanEck Uranium+Nuclear Energy ETF
     
-    **데이터 소스**: Yahoo Finance (yfinance)
+    **데이터 소스**: Yahoo Finance Chart API
     
     **업데이트**: 5분 간격 (5분 캐시)
     """)
@@ -222,4 +276,8 @@ with st.sidebar:
     - 페이지 새로고침 (F5)
     - 잠시 후 다시 시도
     - 다른 기간 옵션 선택
+    
+    **참고:**
+    - Yahoo Finance Chart API 직접 사용
+    - yfinance 라이브러리 미사용
     """)
