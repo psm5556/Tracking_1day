@@ -205,7 +205,7 @@ chart_title = f"주식 등락률 (5분 단위) - {date_option}"
 fig.update_layout(
     title={
         'text': chart_title,
-        'x': 0.5,
+        'x': 1,
         'xanchor': 'center',
         'font': {'size': 20}
     },
