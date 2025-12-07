@@ -27,7 +27,7 @@ ticker_sectors = {
     'IPAY': '결제',
     'FINX': '핀테크',
     'XLF': '금융',
-    'KLXY': '명품',
+    'LVHM': '명품',
     'XLV': '헬스케어',
     'CGW': '물'
 }
@@ -347,7 +347,7 @@ with st.sidebar:
     - IPAY: ETFMG Prime Mobile Payments ETF (결제)
     - FINX: Global X FinTech ETF (핀테크)
     - XLF: Financial Select Sector SPDR (금융)
-    - KLXY: KraneShares Global Luxury Index ETF (명품)
+    - LVHM: 루이비통 (명품)
     - XLV: Health Care Select Sector SPDR (헬스케어)
     - CGW: Invesco S&P Global Water Index ETF (물)
     
