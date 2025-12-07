@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import pytz
 import requests
 import time
@@ -38,30 +38,73 @@ now = datetime.now(et_tz)
 
 # 사이드바에서 날짜 선택 옵션 추가
 with st.sidebar:
-    date_option = st.radio(
-        "날짜 선택:",
-        ["최근 5일", "최근 3일", "최근 1일"],
-        index=0  # 기본값: 최근 5일
+    st.header("📅 날짜 설정")
+    
+    date_mode = st.radio(
+        "날짜 선택 방식:",
+        ["빠른 선택", "특정 날짜 지정"],
+        index=0
     )
     
-    if date_option == "최근 1일":
-        days_back = 5  # 충분한 데이터를 위해 5일 요청
-        days_to_show = 1
-    elif date_option == "최근 3일":
-        days_back = 5
-        days_to_show = 3
-    else:  # 최근 5일
-        days_back = 5
-        days_to_show = 5
+    if date_mode == "빠른 선택":
+        date_option = st.radio(
+            "기간 선택:",
+            ["최근 5일", "최근 3일", "최근 1일"],
+            index=0
+        )
+        
+        if date_option == "최근 1일":
+            days_to_show = 1
+        elif date_option == "최근 3일":
+            days_to_show = 3
+        else:  # 최근 5일
+            days_to_show = 5
+        
+        display_text = date_option
+        
+    else:  # 특정 날짜 지정
+        # 최근 5일 범위 계산
+        today = date.today()
+        min_date = today - timedelta(days=4)  # 오늘 포함 5일
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input(
+                "시작 날짜",
+                value=min_date,
+                min_value=min_date,
+                max_value=today,
+                help="최근 5일 범위 내에서 선택"
+            )
+        
+        with col2:
+            end_date = st.date_input(
+                "종료 날짜",
+                value=today,
+                min_value=min_date,
+                max_value=today,
+                help="최근 5일 범위 내에서 선택"
+            )
+        
+        # 날짜 유효성 검사
+        if start_date > end_date:
+            st.error("⚠️ 시작 날짜는 종료 날짜보다 이전이어야 합니다.")
+            st.stop()
+        
+        days_to_show = None  # 특정 날짜 범위 사용
+        display_text = f"{start_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}"
+
+# 항상 최근 5일 데이터 가져오기
+days_back = 5
 
 # 날짜 표시
-st.markdown(f"**기간**: {date_option} | **간격**: 5분")
+st.markdown(f"**기간**: {display_text} | **간격**: 5분")
 
 @st.cache_data(ttl=300)  # 5분 캐시
-def fetch_stock_data_api(ticker, days_back, days_to_show):
+def fetch_stock_data_api(ticker, days_back):
     """
     Yahoo Finance Chart API를 직접 호출하여 주식 데이터 가져오기
-    첨부 코드의 get_stock_data 함수와 동일한 방식
+    항상 최근 5일 데이터를 가져옴
     """
     try:
         # 날짜 범위 계산
@@ -133,49 +176,79 @@ def fetch_stock_data_api(ticker, days_back, days_to_show):
         df = df.set_index('Date')
         df = df.sort_index()
         
-        # 최근 N일 데이터만 필터링
-        if days_to_show < days_back and len(df) > 0:
-            cutoff_date = df.index[-1] - timedelta(days=days_to_show)
-            df = df[df.index >= cutoff_date]
-        
-        if df.empty:
-            return None
-        
-        # 시작 가격을 0%로 정규화
-        start_price = df['Close'].iloc[0]
-        df['Return'] = ((df['Close'] - start_price) / start_price) * 100
-        
         return df
         
     except Exception as e:
         print(f"Error fetching data for {ticker}: {e}")
         return None
 
+def filter_and_normalize_data(df, days_to_show=None, start_date=None, end_date=None):
+    """
+    데이터 필터링 및 정규화
+    """
+    if df is None or df.empty:
+        return None
+    
+    # 날짜 필터링
+    if days_to_show is not None:
+        # 빠른 선택 모드: 최근 N일
+        cutoff_date = df.index[-1] - timedelta(days=days_to_show)
+        df_filtered = df[df.index >= cutoff_date].copy()
+    else:
+        # 특정 날짜 모드
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        df_filtered = df[(df.index >= start_datetime) & (df.index <= end_datetime)].copy()
+    
+    if df_filtered.empty:
+        return None
+    
+    # 시작 가격을 0%로 정규화
+    start_price = df_filtered['Close'].iloc[0]
+    df_filtered['Return'] = ((df_filtered['Close'] - start_price) / start_price) * 100
+    
+    return df_filtered
+
 # 데이터 로딩
 with st.spinner('데이터를 불러오는 중...'):
-    all_data = {}
+    all_raw_data = {}
     progress_bar = st.progress(0)
     
     for idx, ticker in enumerate(tickers):
-        data = fetch_stock_data_api(ticker, days_back, days_to_show)
+        data = fetch_stock_data_api(ticker, days_back)
         if data is not None and len(data) > 0:
-            all_data[ticker] = data
+            all_raw_data[ticker] = data
         # API rate limiting
         time.sleep(0.1)
         progress_bar.progress((idx + 1) / len(tickers))
     
     progress_bar.empty()
 
-if not all_data:
+if not all_raw_data:
     st.error("⚠️ 데이터를 불러올 수 없습니다.")
     st.info("💡 Yahoo Finance API에 일시적인 문제가 있을 수 있습니다. 잠시 후 다시 시도해주세요.")
+    st.stop()
+
+# 필터링 및 정규화
+all_data = {}
+for ticker, raw_df in all_raw_data.items():
+    if date_mode == "빠른 선택":
+        filtered_df = filter_and_normalize_data(raw_df, days_to_show=days_to_show)
+    else:
+        filtered_df = filter_and_normalize_data(raw_df, start_date=start_date, end_date=end_date)
+    
+    if filtered_df is not None and len(filtered_df) > 0:
+        all_data[ticker] = filtered_df
+
+if not all_data:
+    st.warning("⚠️ 선택한 날짜 범위에 데이터가 없습니다.")
+    st.info("💡 다른 날짜를 선택해보세요. (미국 장이 열리는 시간에만 데이터가 생성됩니다)")
     st.stop()
 
 # 차트 생성
 fig = go.Figure()
 
 # 각 티커의 등락률 라인 추가
-# Plotly의 qualitative color scales 자동 사용
 import plotly.express as px
 colors = px.colors.qualitative.Plotly + px.colors.qualitative.D3 + px.colors.qualitative.G10
 
@@ -200,7 +273,7 @@ for idx, (ticker, df) in enumerate(all_data.items()):
 fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
 
 # 레이아웃 설정
-chart_title = f"주식 등락률 (5분 단위) - {date_option}"
+chart_title = f"주식 등락률 (5분 단위) - {display_text}"
 
 fig.update_layout(
     title={
@@ -239,6 +312,7 @@ for ticker, df in all_data.items():
     if len(df) > 0:
         stats_data.append({
             '티커': ticker,
+            '섹터': ticker_sectors.get(ticker, ''),
             '시작가': f"${df['Close'].iloc[0]:.2f}",
             '현재가': f"${df['Close'].iloc[-1]:.2f}",
             '등락률': f"{df['Return'].iloc[-1]:.2f}%",
@@ -296,6 +370,10 @@ with st.sidebar:
     st.markdown("""
     ### 💡 사용 팁
     
+    **날짜 선택 방식:**
+    - **빠른 선택**: 최근 1/3/5일 중 선택
+    - **특정 날짜 지정**: 원하는 기간 직접 설정
+    
     **5분 데이터 특성:**
     - 장중 시간대에만 데이터 생성
     - 미국 동부시간 기준 9:30 AM ~ 4:00 PM
@@ -307,6 +385,7 @@ with st.sidebar:
     - 다른 기간 옵션 선택
     
     **참고:**
+    - 항상 최근 5일 데이터를 가져옴
+    - 선택한 날짜 범위만 표시
     - Yahoo Finance Chart API 직접 사용
-    - yfinance 라이브러리 미사용
     """)
