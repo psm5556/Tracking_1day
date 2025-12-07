@@ -11,7 +11,7 @@ st.set_page_config(page_title="Stock Price Chart", layout="wide")
 st.title("📈 5분 단위 주식 등락률 차트")
 
 # 티커 리스트
-tickers = ['QTUM', 'UFO', 'ARKG', 'URA', 'SPAM', 'XLU', 'HYDR', 'SOXX', 'VDC', 'IPAY', 'FINX', 'XLF', 'KLXY', 'XLV', 'CGW']
+tickers = ['QTUM', 'UFO', 'ARKG', 'URA', 'SPAM', 'XLU', 'HYDR', 'SOXX', 'VDC', 'IPAY', 'FINX', 'XLF', 'LVHM', 'XLV', 'CGW']
 
 # 티커-섹터 매핑
 ticker_sectors = {
