@@ -155,13 +155,16 @@ def fetch_stock_data_api(ticker, days_back):
         closes = indicators.get('close', [])
         volumes = indicators.get('volume', [])
         
-        # DataFrame 생성
+        # DataFrame 생성 (뉴욕 시간으로 변환)
+        et_tz = pytz.timezone('America/New_York')
         data_list = []
         for i in range(len(timestamps)):
             if closes[i] is not None and opens[i] is not None and highs[i] is not None and lows[i] is not None:
-                date = datetime.fromtimestamp(timestamps[i])
+                # UTC 시간을 뉴욕 시간으로 변환
+                utc_date = datetime.fromtimestamp(timestamps[i], tz=pytz.UTC)
+                et_date = utc_date.astimezone(et_tz)
                 data_list.append({
-                    'Date': date,
+                    'Date': et_date,
                     'Open': float(opens[i]),
                     'High': float(highs[i]),
                     'Low': float(lows[i]),
@@ -189,15 +192,17 @@ def filter_and_normalize_data(df, days_to_show=None, start_date=None, end_date=N
     if df is None or df.empty:
         return None
     
+    et_tz = pytz.timezone('America/New_York')
+    
     # 날짜 필터링
     if days_to_show is not None:
         # 빠른 선택 모드: 최근 N일
         cutoff_date = df.index[-1] - timedelta(days=days_to_show)
         df_filtered = df[df.index >= cutoff_date].copy()
     else:
-        # 특정 날짜 모드
-        start_datetime = datetime.combine(start_date, datetime.min.time())
-        end_datetime = datetime.combine(end_date, datetime.max.time())
+        # 특정 날짜 모드 - 뉴욕 시간대로 변환
+        start_datetime = et_tz.localize(datetime.combine(start_date, datetime.min.time()))
+        end_datetime = et_tz.localize(datetime.combine(end_date, datetime.max.time()))
         df_filtered = df[(df.index >= start_datetime) & (df.index <= end_datetime)].copy()
     
     if df_filtered.empty:
@@ -273,7 +278,7 @@ for idx, (ticker, df) in enumerate(all_data.items()):
 fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
 
 # 레이아웃 설정
-chart_title = f"주식 등락률 (5분 단위) - {display_text}"
+chart_title = f"주식 등락률 (5분 단위, ET 기준) - {display_text}"
 
 fig.update_layout(
     title={
@@ -369,6 +374,11 @@ with st.sidebar:
     # 사용 팁
     st.markdown("""
     ### 💡 사용 팁
+    
+    **시간 표시:**
+    - 모든 시간은 뉴욕 시간(ET) 기준
+    - EST (동부 표준시, UTC-5)
+    - EDT (동부 일광절약시, UTC-4)
     
     **날짜 선택 방식:**
     - **빠른 선택**: 최근 1/3/5일 중 선택
